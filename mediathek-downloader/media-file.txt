@@ -1,0 +1,19 @@
+# Quelle: https://mediathekviewweb.de/
+# This file is intended to be processed by the tool "mediathek_downloader.rb" which downloads the contect from the movies below.
+#
+# Template:
+#-------------
+#<Sender>
+#<Thema>
+#<Titel>
+#(<Episode>)
+#<Datum>	<Uhrzeit> <Dauer>
+
+#<Kommentar>
+
+#<URL>
+#<URL>
+
+# Add entries after the dash line and separate them with dash lines
+-------------
+

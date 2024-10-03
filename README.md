@@ -13,7 +13,7 @@ under Windows native and WinLinux.
  - Go
 
 Projects:
- - MediaWeb-Downloader (Windows) 
- - iCloudPhoto (Windows / WinLinux)  - Compare iCloud photo directories
+ - MediaWeb-Downloader (WinLinux) - Download content from Mediathek 
+ - iCloudPhoto (Windows / WinLinux) - Compare iCloud photo directories
 
 The Git repository is managed under WinLinux.

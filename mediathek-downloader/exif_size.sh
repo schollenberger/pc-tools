@@ -1,0 +1,1 @@
+exiftool -p '$Filename $ImageSize' "$@"
