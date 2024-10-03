@@ -13,8 +13,13 @@
 #
 # 02.10.-2024 Werner Schollenberger
 
-# Note: This version expect the left list file
+# Note: This version expects the left list file to contain the output of
+#       a md5sum command on all files in the directory.
+#       For right file (current iCloud dir) it is expected to contain
+#       the parent directory (Photos) as part of the names,
+#       e.g. "Photos/00d7ac61-cc99-46ac-ba3d-85fb303a37b9.jpg"
 #
+
 import os
 
 # Directory where you want to search for the files
