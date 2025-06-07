@@ -196,7 +196,7 @@ class MediathekDownloader
 
     download_list.each do |entry|
       fn, url = entry
-      if File.exists?(fn) and ! overwrite
+      if File.exist?(fn) and ! overwrite
          logger.warn "Skipping download of file <#{fn}> that already exists, use overwrite option if needed"
       else
          command = "wget -O #{fn} #{url}"
