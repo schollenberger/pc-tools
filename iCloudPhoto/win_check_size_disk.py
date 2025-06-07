@@ -1,10 +1,11 @@
-# This program checks whether files in an iCloud Photo directory are synced
-# or not. This is done by looking on the real size of the file on disk.
-# For a non-synced file this is 0.
+# This program determines the file's size on the disk.
+# It can be used to checks whether files in an iCloud Photo directory
+# are synced or not. For a non-synced file the size on disk is 0.
 #
-# It is not easy to determine the space on disk a file occupies under WinLinux.
-# So wie took an Windows specific approach using the ctypes module.
-# This progarm must in a windows shell.
+# We could not find out how to determine which on disk space a file occupies
+# under WinLinux. So wie took an Windows specific approach using the
+# ctypes module.
+# Therefore his progarm must in a windows shell.
 
 # Note: This version expects the left list file to contain the output of
 #       a md5sum command on all files in the directory.
@@ -16,6 +17,11 @@
 
 import os
 import ctypes
+
+if os.name != 'nt':
+    print("*** Program must run under Windows ***")
+    print("Aborting...")
+    exit()
 
 dir = "D:\\iCloudPhotos-Werner\\Photos"
 ##fns = ['4fedc65d-8c91-4f31-a8ec-daba787c1465.jpg', '6a2abca4-0f05-4f2b-a507-91f98886107d.jpg']
