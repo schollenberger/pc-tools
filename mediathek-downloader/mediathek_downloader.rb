@@ -5,15 +5,43 @@ require 'logger'
 # This program reads a text file and extracts the neccessary information to
 # download videos from web site MediathekViewWeb .
 
+# Quality filters
+FILTER_DEFAULT_HIGH    = "_1920x,_3360k_,\\.xxl\\."
+FILTER_DEFAULT_MEDIUM  = "_960x,_2360k_,\\.l\\."
+
+FILTER_KEYWORD         = "QFILTER"
+FILTER_KEYWORD_HIGH    = FILTER_KEYWORD + "_HIGH"
+FILTER_KEYWORD_MEDIUM  = FILTER_KEYWORD + "_MEDIUM"
+
+
 class InternalError < StandardError
   #  puts "EXCEPTION: Internal Error, does not need to have Stack tracing, exit_code is set.
 end
 
 
 class MediathekDownloader
+
   def initialize(filename)
-    @textfile = filename
+    @textfile = filename    # media file containing video download and meta information
   end
+
+# Analyses media file and returns two lists:
+#  download_list (data to download the videos)
+#  readme_list   (info to to be writen on the metadata (readme) file)
+#
+# The media file may contain serveral entries separated with at least 3 dashes ("---").
+# Each entry is parsed line by line.The first 6 lines contains the video metadata followed by
+# a list of URLs which are to be downloaded.
+# URL entries are expected to start with "http" and are parsed for file quality information
+# and URL type (movie / subtitle).
+# If parsed successfully, they go to the download_list as the are found with the destination 
+# file name constructed from the metadata and the quality information.
+# Movie URL have to end with ".mp4" and subtitle URL have to contain the term "subtitle".
+#
+# At the beginning of an new entry and if the metadata fields are complete a new entry
+# is added to the readme_list.
+# If the entry is incomplete, all the entries in the download_list have to be removed as they
+# won't correlate to a readme entry. 
 
   def analyse
     raise InternalError, "Global logger variable not defined." if not $logger
@@ -41,6 +69,8 @@ class MediathekDownloader
     m_date = ""
     m_time = ""
     m_duration = ""
+    filter_high   = FILTER_DEFAULT_HIGH
+    filter_medium = FILTER_DEFAULT_MEDIUM
 
     datamap.each do |entry|
       lineno += 1
@@ -51,50 +81,59 @@ class MediathekDownloader
         logger.debug "Ignoring empty line"
         next
       elsif entry.strip.start_with?("---")
-        logger.info "--- New entry on line #{lineno} - closing up old one..."
-        if !sender.empty? && !title.empty? && !episode.empty? && !seq.empty? &&
-           !comment.empty?
-          logger.info "Completed entry - #{sender} - #{title} - #{episode} - #{seq} - #{m_date} - #{m_time} - #{m_duration}"
-          logger.info "Completed comment: <#{comment}>"
-          logger.info "---"
-          if seq == "_"
-            readme_filename = "#{title_filename}-readme.txt"
-          else
-            readme_filename = "#{title_filename}-#{seq}-readme.txt"
-          end
-          readme_list << [readme_filename.clone, sender.clone, title.clone,
-                          episode.clone, seq.clone, m_date.clone, m_time.clone,
-                          m_duration.clone, comment.clone]
-          # logger.info "Writing download info file to: #{readme_filename}"
-        else
-          logger.warn "** Incomplete previous entry:  - #{sender} - #{title} - #{episode} - #{seq}"
-          logger.warn "** Comment on incomplete entry: <#{comment}>"
-          # looking for element in download_list
-          _delete_list = Array.new
-          download_list.each do |entry|
-            if entry[0].match?(title_filename)
-              logger.debug "** Marking element <#{entry[0]}> for deletion from download list."
-              _delete_list << entry
+        if count > 0
+          logger.info "--- New entry on line #{lineno} - closing up old one..."
+          if !sender.empty? && !title.empty? && !episode.empty? && !seq.empty? &&
+             !comment.empty?
+            # All entry fields parsed successfully - add entry to the readme_list
+            logger.info "Completed entry - #{sender} - #{title} - #{episode} - #{seq} - #{m_date} - #{m_time} - #{m_duration}"
+            logger.info "Completed comment: <#{comment}>"
+            logger.info "---"
+            if seq == "_"
+              readme_filename = "#{title_filename}-readme.txt"
+            else
+              readme_filename = "#{title_filename}-#{seq}-readme.txt"
             end
-          end
-          _delete_list.each do |entry|
-            logger.info "** Deleting entry <#{entry[0]}> from download_list."
-            download_list.delete(entry)
-          end
+            readme_list << [readme_filename.clone, sender.clone, title.clone,
+                            episode.clone, seq.clone, m_date.clone, m_time.clone,
+                            m_duration.clone, comment.clone]
+            # logger.info "Writing download info file to: #{readme_filename}"
+          else
+            logger.warn "** Incomplete previous entry:  - #{sender} - #{title} - #{episode} - #{seq}"
+            logger.warn "** Comment on incomplete entry: <#{comment}>"
+            # looking for element in download_list
+            _delete_list = Array.new
+            download_list.each do |entry|
+              if entry[0].match?(title_filename)
+                logger.debug "** Marking element <#{entry[0]}> for deletion from download list."
+                _delete_list << entry
+              end
+            end
+            _delete_list.each do |entry|
+              logger.info "** Deleting entry <#{entry[0]}> from download_list."
+              download_list.delete(entry)
+            end
+          end  # if !sender.empty? && ...
+          count = 0
+          sender.clear
+          title.clear
+          title_filename.clear if title_filename
+          seq.clear
+          comment.clear
+          episode.clear
+          m_date.clear
+          m_time.clear
+          m_duration.clear
+          # reset filter to default
+          #filter_high   = FILTER_DEFAULT_HIGH
+          #filter_medium = FILTER_DEFAULT_MEDIUM
+
+        else # if count > 0
+           logger.info "--- New entry on line #{lineno}..."
         end
-        count = 0
-        sender.clear
-        title.clear
-        title_filename.clear if title_filename
-        seq.clear
-        comment.clear
-        episode.clear
-        m_date.clear
-        m_time.clear
-        m_duration.clear
       else
-        count += 1
-      end
+        count += 1  # this a valid entry line which is analysed based on its position in the following
+      end # elsif entry.strip.start_with?("---")
 
       #logger.debug "Analysing line #{lineno} - count #{count}..."
       case count
@@ -137,30 +176,66 @@ class MediathekDownloader
         logger.info "Comment line found with #{comment.length()} characters."
         # logger.info "Comment: <#{comment}>"
       else
+        # Were done with reading the metadata, look for URL entries
         if entry and entry.strip.length() > 0
           if entry.start_with?("http")
             url = entry.strip
             logger.debug "URL: #{url}"
+          elsif entry.start_with?(FILTER_KEYWORD)
+            logger.info "Filter change command found"
+            if entry.start_with?(FILTER_KEYWORD_HIGH) and entry.split(" ")[1].length > 0
+              filter_high = entry.split(" ")[1]
+              logger.info "High quality ilter set to  <#{filter_high}>"
+            elsif entry.start_with?(FILTER_KEYWORD_MEDIUM)
+              filter_medium = entry.split(" ")[1] and entry.split(" ")[1].length > 0
+              logger.info "Medium quality filter set to  <#{filter_medium}>"
+            end
+            next
           else
-            logger.error "Expected http URL #{count} line #{lineno} - found <#{entry}>"
+            logger.error "Expected http URL or #{FILTER_KEYWORD} keyword #{count} line #{lineno} - found <#{entry}>"
             next
           end
           if url.end_with?(".mp4")
             logger.debug "** movie download ..."
             url_filename = url[url.rindex('/')+1 .. -1]
             logger.info "Found *movie* URL wih filename: #{url_filename}"
-            movie_quality = "-not_defined"
-            if url_filename.match?("_960x") or url_filename.match?("\\.l\\.") or url_filename.match?("_2360k_")
-              logger.info "Movie quality = medium"
-              movie_quality = "-medium"
-            elsif url_filename.match?("_1920x") or url_filename.match?("\\.xxl\\.") or url_filename.match?("_3360k_") or url_filename.match?("_3328k_")
-              logger.info "Movie quality = high"
-              movie_quality = "-high"
-            else
-              logger.warn "Could not detect movie quality"
 
+            # Lets look for movie quality information within the URL filename - high or medium
+            # 2025-06-09: As the mediathek filename encoding changes all the time we cannot rely
+            #             on fixed match conditions.
+            #             Even entries, e.g. "_3360k_" that identified high quality later stand
+            #             for medium quality.
+            #             Therfore we made the matching more flexible getting the match strings
+            #             by a comma separated filter.
+            #             You may overwrite the default quality identifiers in the URL section
+            #             via lines staring with special keywords.
+            movie_quality = "-not_defined"
+#            if url_filename.match?("_960x") or url_filename.match?("\\.l\\.") or url_filename.match?("_2360k_")
+            filter_medium.split(",").each() do |filter|
+#              logger.info "-- Filter medium #{filter}"
+              if url_filename.match?(filter)
+                logger.info "Movie quality = medium"
+                movie_quality = "-medium"
+              end
+            end
+#            elsif url_filename.match?("_1920x") or url_filename.match?("\\.xxl\\.") or url_filename.match?("_3360k_") or url_filename.match?("_3328k_")
+            if movie_quality.eql?("-not_defined")
+#              logger.info "-- url file did not match medium quality"
+              filter_high.split(",").each() do |filter|
+#                logger.info "-- Filter high #{filter}"
+                if url_filename.match?(filter)
+                  logger.info "Movie quality = high"
+                  movie_quality = "-high"
+                end
+              end
+            end
+#            else
+            if movie_quality.eql?("-not_defined")
+              logger.warn "Could not detect movie quality"
               movie_quality = ""
             end
+
+            # Construct the movie name based whether a squence number (Episode info) is available of not
             if seq == "_"
               movie_name = "#{title_filename}#{movie_quality}.mp4"
             else
@@ -274,6 +349,6 @@ if __FILE__ == $0
   #end
   #puts "-----------------------"
 
-  obj.download(download_list)
-  obj.write_readme(readme_list)
+#  obj.download(download_list)
+#  obj.write_readme(readme_list)
 end

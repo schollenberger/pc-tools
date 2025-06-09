@@ -11,6 +11,11 @@
 
 #<Kommentar>
 
+#Quailty filter change - valit for the remaining entries
+#QFILTER_HIGH "_1920x,_3360k_,\\.xxl\\."   # change high quality filter (comma separated list)
+#QFILTER_MEDIUM "_920x,_2360k_,\\.l\\."    # change medium quality filter (comma separated list)
+
+
 #<URL>
 #<URL>
 
